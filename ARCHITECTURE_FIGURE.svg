@@ -1,0 +1,262 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <defs>
+    <linearGradient id="denoiserGrad" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffd29a"/>
+      <stop offset="50%" stop-color="#e5c3ff"/>
+      <stop offset="100%" stop-color="#bfd7ff"/>
+    </linearGradient>
+    <linearGradient id="geoGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+      <stop offset="0%" stop-color="#ffe1a8"/>
+      <stop offset="100%" stop-color="#bfe7dc"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+      <stop offset="0%" stop-color="#d7c5ff"/>
+      <stop offset="100%" stop-color="#bde6ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#1f2937" flood-opacity="0.18"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#4b5563"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#7c3aed"/>
+    </marker>
+    <style>
+      .bg { fill: #fbfbfe; }
+      .title { font: 700 30px Arial, sans-serif; fill: #5b32b4; }
+      .subtitle { font: 500 15px Arial, sans-serif; fill: #4b5563; }
+      .panel { fill: #ffffff; stroke: #8b8f99; stroke-width: 2; rx: 12; filter: url(#shadow); }
+      .panelTitle { font: 700 18px Arial, sans-serif; fill: #111827; }
+      .smallTitle { font: 700 15px Arial, sans-serif; fill: #111827; }
+      .label { font: 600 13px Arial, sans-serif; fill: #1f2937; }
+      .tiny { font: 500 11px Arial, sans-serif; fill: #374151; }
+      .code { font: 600 11px Consolas, monospace; fill: #111827; }
+      .box { fill: #eef4ff; stroke: #64748b; stroke-width: 1.6; rx: 8; }
+      .boxWarm { fill: #fff3df; stroke: #f59e0b; stroke-width: 1.6; rx: 8; }
+      .boxGreen { fill: #e7f7ef; stroke: #22a06b; stroke-width: 1.6; rx: 8; }
+      .boxPink { fill: #fff0f7; stroke: #d946ef; stroke-width: 1.6; rx: 8; }
+      .boxViolet { fill: #f1ecff; stroke: #7c3aed; stroke-width: 1.6; rx: 8; }
+      .module { fill: #dbeafe; stroke: #475569; stroke-width: 1.7; rx: 8; }
+      .moduleHot { fill: url(#denoiserGrad); stroke: #6b7280; stroke-width: 1.8; rx: 10; }
+      .arrow { stroke: #4b5563; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .arrowThin { stroke: #6b7280; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .arrowPurple { stroke: #7c3aed; stroke-width: 2.2; fill: none; marker-end: url(#arrowPurple); }
+      .dash { stroke-dasharray: 6 5; }
+      .tokenOrange { fill: #ffb36b; stroke: #ea580c; stroke-width: 1.4; rx: 5; }
+      .tokenYellow { fill: #ffe071; stroke: #d97706; stroke-width: 1.4; rx: 5; }
+      .tokenGreen { fill: #a7e7a4; stroke: #16a34a; stroke-width: 1.4; rx: 5; }
+      .tokenBlue { fill: #9fd0ff; stroke: #2563eb; stroke-width: 1.4; rx: 5; }
+      .tokenViolet { fill: #c7a7ff; stroke: #7c3aed; stroke-width: 1.4; rx: 5; }
+      .tokenGray { fill: #f3f4f6; stroke: #6b7280; stroke-width: 1.2; rx: 5; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="900"/>
+  <text class="title" x="700" y="34" text-anchor="middle">GeoPOSE Geometry-Prompt Diffusion Architecture</text>
+  <text class="subtitle" x="700" y="58" text-anchor="middle">Strictly mapped to main.py, common/finepose.py, common/geometry_prompt.py and common/mixste_finepose.py</text>
+
+  <!-- Top panel: model core -->
+  <rect class="panel" x="32" y="78" width="1336" height="414"/>
+  <text class="panelTitle" x="54" y="107">FinePOSE diffusion wrapper: geometry-conditioned denoising</text>
+  <text class="code" x="54" y="128">common/finepose.py :: FinePOSE.forward / q_sample / ddim_sample / ddim_sample_flip</text>
+
+  <rect class="boxWarm" x="55" y="165" width="82" height="75"/>
+  <text class="smallTitle" x="96" y="193" text-anchor="middle">2D pose</text>
+  <text class="tiny" x="96" y="214" text-anchor="middle">inputs_2d</text>
+  <text class="tiny" x="96" y="230" text-anchor="middle">B x F x J x 2/3</text>
+
+  <rect class="boxViolet" x="55" y="280" width="82" height="75"/>
+  <text class="smallTitle" x="96" y="306" text-anchor="middle">noisy 3D</text>
+  <text class="tiny" x="96" y="327" text-anchor="middle">x_t</text>
+  <text class="tiny" x="96" y="343" text-anchor="middle">q_sample/DDIM</text>
+
+  <path class="arrow" d="M137 202 C156 202, 158 202, 176 202"/>
+  <path class="arrow" d="M137 318 C156 318, 158 318, 176 318"/>
+
+  <rect class="module" x="178" y="165" width="132" height="190"/>
+  <text class="smallTitle" x="244" y="204" text-anchor="middle">concat</text>
+  <text class="tiny" x="244" y="225" text-anchor="middle">inputs_2d + x_t</text>
+  <line x1="202" y1="250" x2="286" y2="250" stroke="#94a3b8" stroke-width="1.5"/>
+  <text class="smallTitle" x="244" y="281" text-anchor="middle">Spatial patch</text>
+  <text class="tiny" x="244" y="302" text-anchor="middle">Spatial_patch_to_</text>
+  <text class="tiny" x="244" y="318" text-anchor="middle">embedding</text>
+
+  <path class="arrow" d="M310 260 C326 260, 328 260, 344 260"/>
+
+  <rect class="moduleHot" x="346" y="154" width="168" height="212"/>
+  <text class="smallTitle" x="430" y="190" text-anchor="middle">Geometry prompt</text>
+  <text class="smallTitle" x="430" y="211" text-anchor="middle">injection</text>
+  <text class="tiny" x="430" y="238" text-anchor="middle">Geometry_prompt_to_</text>
+  <text class="tiny" x="430" y="254" text-anchor="middle">embedding</text>
+  <text class="tiny" x="430" y="283" text-anchor="middle">15D per joint token</text>
+  <text class="code" x="430" y="315" text-anchor="middle">MixSTE2.STE_forward()</text>
+
+  <path class="arrow" d="M514 260 C532 260, 535 260, 552 260"/>
+
+  <rect class="boxGreen" x="553" y="154" width="145" height="212"/>
+  <text class="smallTitle" x="625" y="189" text-anchor="middle">Time + text</text>
+  <text class="tiny" x="625" y="215" text-anchor="middle">time_mlp(t)</text>
+  <text class="tiny" x="625" y="234" text-anchor="middle">+</text>
+  <text class="tiny" x="625" y="253" text-anchor="middle">text_proj(xf_out)</text>
+  <text class="code" x="625" y="286" text-anchor="middle">xf_proj</text>
+  <text class="tiny" x="625" y="315" text-anchor="middle">added to spatial tokens</text>
+
+  <path class="arrow" d="M698 260 C714 260, 717 260, 733 260"/>
+
+  <rect class="module" x="735" y="154" width="118" height="212"/>
+  <text class="smallTitle" x="794" y="205" text-anchor="middle">STEblocks[0]</text>
+  <text class="tiny" x="794" y="232" text-anchor="middle">spatial MHSA</text>
+  <text class="tiny" x="794" y="252" text-anchor="middle">per frame</text>
+  <text class="tiny" x="794" y="290" text-anchor="middle">Spatial_norm</text>
+
+  <path class="arrow" d="M853 260 C870 260, 873 260, 890 260"/>
+
+  <rect class="moduleHot" x="892" y="132" width="194" height="256"/>
+  <text class="smallTitle" x="989" y="181" text-anchor="middle">Temporal</text>
+  <text class="smallTitle" x="989" y="203" text-anchor="middle">Cross Attention</text>
+  <text class="tiny" x="989" y="231" text-anchor="middle">temporal_cross_attn</text>
+  <text class="tiny" x="989" y="253" text-anchor="middle">query: pose tokens</text>
+  <text class="tiny" x="989" y="273" text-anchor="middle">key/value: xf_out</text>
+  <text class="code" x="989" y="310" text-anchor="middle">TemporalCrossAttention</text>
+  <text class="tiny" x="989" y="340" text-anchor="middle">text-conditioned pose update</text>
+
+  <path class="arrow" d="M1086 260 C1103 260, 1106 260, 1123 260"/>
+
+  <rect class="module" x="1125" y="154" width="115" height="212"/>
+  <text class="smallTitle" x="1182" y="202" text-anchor="middle">TTEblocks[0]</text>
+  <text class="tiny" x="1182" y="230" text-anchor="middle">temporal MHSA</text>
+  <text class="tiny" x="1182" y="251" text-anchor="middle">Temporal_norm</text>
+
+  <path class="arrow" d="M1240 260 C1254 260, 1256 260, 1270 260"/>
+
+  <rect class="module" x="1272" y="154" width="66" height="212"/>
+  <text class="smallTitle" x="1305" y="198" text-anchor="middle">ST</text>
+  <text class="smallTitle" x="1305" y="219" text-anchor="middle">repeat</text>
+  <text class="tiny" x="1305" y="246" text-anchor="middle">depth</text>
+  <text class="tiny" x="1305" y="264" text-anchor="middle">args.dep</text>
+  <text class="tiny" x="1305" y="306" text-anchor="middle">head</text>
+  <text class="tiny" x="1305" y="324" text-anchor="middle">3D</text>
+
+  <path class="arrow" d="M1305 366 C1305 395, 1212 418, 1088 418"/>
+  <text class="tiny" x="1207" y="408">DDIM loop: x_start updates x_t</text>
+
+  <rect class="boxPink" x="1088" y="405" width="250" height="58"/>
+  <text class="smallTitle" x="1213" y="428" text-anchor="middle">predicted 3D pose x0</text>
+  <text class="tiny" x="1213" y="448" text-anchor="middle">train: MPJPE | eval: proposals per step</text>
+
+  <path class="arrowPurple" d="M635 512 C635 480, 625 410, 625 367"/>
+  <text class="tiny" x="646" y="472" fill="#7c3aed">text condition</text>
+  <path class="arrowPurple" d="M720 512 C680 470, 544 400, 430 367"/>
+  <text class="tiny" x="548" y="445" fill="#7c3aed">geometry condition</text>
+
+  <rect class="tokenOrange" x="357" y="402" width="26" height="26"/>
+  <rect class="tokenYellow" x="389" y="402" width="26" height="26"/>
+  <rect class="tokenGreen" x="421" y="402" width="26" height="26"/>
+  <rect class="tokenBlue" x="453" y="402" width="26" height="26"/>
+  <rect class="tokenViolet" x="485" y="402" width="26" height="26"/>
+  <text class="tiny" x="433" y="447" text-anchor="middle">geometry_prompt: reproj error, ray, depth, confidence, coarse 3D</text>
+
+  <!-- Bottom left: data pipeline -->
+  <rect class="panel" x="32" y="522" width="410" height="330"/>
+  <text class="panelTitle" x="54" y="552">Data pipeline in main.py</text>
+
+  <rect class="boxWarm" x="54" y="580" width="166" height="58"/>
+  <text class="smallTitle" x="137" y="604" text-anchor="middle">3D annotations</text>
+  <text class="code" x="137" y="624" text-anchor="middle">data_3d_*.npz</text>
+
+  <rect class="boxWarm" x="252" y="580" width="166" height="58"/>
+  <text class="smallTitle" x="335" y="604" text-anchor="middle">2D detections</text>
+  <text class="code" x="335" y="624" text-anchor="middle">data_2d_*.npz</text>
+
+  <path class="arrowThin" d="M137 638 C137 658, 174 660, 201 676"/>
+  <path class="arrowThin" d="M335 638 C335 658, 262 660, 236 676"/>
+
+  <rect class="box" x="84" y="676" width="306" height="54"/>
+  <text class="smallTitle" x="237" y="699" text-anchor="middle">Human36mDataset + camera.py</text>
+  <text class="tiny" x="237" y="719" text-anchor="middle">world_to_camera, normalize_screen_coordinates</text>
+
+  <path class="arrowThin" d="M237 730 C237 748, 237 750, 237 767"/>
+  <rect class="box" x="84" y="768" width="306" height="54"/>
+  <text class="smallTitle" x="237" y="791" text-anchor="middle">fetch() + Generators</text>
+  <text class="tiny" x="237" y="811" text-anchor="middle">camera_intrinsic, inputs_2d, inputs_3d, action</text>
+
+  <path class="arrowPurple" d="M390 795 C465 795, 506 667, 553 642"/>
+
+  <!-- Bottom middle: geometry prompt -->
+  <rect class="panel" x="466" y="522" width="530" height="330"/>
+  <text class="panelTitle" x="488" y="552">Geometry prompt branch</text>
+  <text class="code" x="488" y="574">common/geometry_prompt.py :: TemporalConvPose + GeometryPromptBuilder</text>
+
+  <rect class="boxWarm" x="492" y="602" width="116" height="62"/>
+  <text class="smallTitle" x="550" y="626" text-anchor="middle">inputs_2d</text>
+  <text class="tiny" x="550" y="646" text-anchor="middle">xy + optional conf</text>
+
+  <path class="arrow" d="M608 633 C624 633, 628 633, 644 633"/>
+  <rect class="boxGreen" x="646" y="590" width="156" height="86"/>
+  <text class="smallTitle" x="724" y="617" text-anchor="middle">TemporalConvPose</text>
+  <text class="tiny" x="724" y="638" text-anchor="middle">Conv1d residual TCN</text>
+  <text class="tiny" x="724" y="656" text-anchor="middle">coarse root-relative 3D</text>
+
+  <path class="arrow" d="M802 633 C820 633, 824 633, 842 633"/>
+  <rect class="box" x="844" y="590" width="128" height="86"/>
+  <text class="smallTitle" x="908" y="616" text-anchor="middle">absolute 3D</text>
+  <text class="tiny" x="908" y="637" text-anchor="middle">coarse +</text>
+  <text class="tiny" x="908" y="655" text-anchor="middle">root_trajectory</text>
+
+  <rect class="tokenGray" x="505" y="704" width="102" height="40"/>
+  <text class="tiny" x="556" y="728" text-anchor="middle">camera params</text>
+  <rect class="tokenGray" x="626" y="704" width="102" height="40"/>
+  <text class="tiny" x="677" y="728" text-anchor="middle">root trajectory</text>
+  <rect class="tokenGray" x="747" y="704" width="102" height="40"/>
+  <text class="tiny" x="798" y="728" text-anchor="middle">project_to_2d</text>
+  <rect class="tokenGray" x="868" y="704" width="102" height="40"/>
+  <text class="tiny" x="919" y="721" text-anchor="middle">camera ray</text>
+  <text class="tiny" x="919" y="735" text-anchor="middle">depth</text>
+
+  <path class="arrowThin" d="M908 676 C908 690, 823 690, 798 704"/>
+  <path class="arrowThin" d="M556 704 C574 684, 602 671, 646 648"/>
+  <path class="arrowThin" d="M677 704 C700 688, 735 684, 844 652"/>
+  <path class="arrowThin" d="M798 744 C798 769, 770 770, 742 782"/>
+  <path class="arrowThin" d="M919 744 C900 769, 828 770, 758 782"/>
+
+  <rect class="moduleHot" x="587" y="780" width="270" height="50"/>
+  <text class="smallTitle" x="722" y="802" text-anchor="middle">geometry_prompt</text>
+  <text class="tiny" x="722" y="821" text-anchor="middle">15 channels: error, norm, ray, depth, conf, coarse, projected, observed</text>
+
+  <!-- Bottom right: CLIP text prompt -->
+  <rect class="panel" x="1020" y="522" width="348" height="330"/>
+  <text class="panelTitle" x="1042" y="552">CLIP text prompt branch</text>
+  <text class="code" x="1042" y="574">MixSTE2.encode_text()</text>
+
+  <rect class="boxViolet" x="1046" y="600" width="122" height="68"/>
+  <text class="smallTitle" x="1107" y="625" text-anchor="middle">action text</text>
+  <text class="tiny" x="1107" y="646" text-anchor="middle">batch_act</text>
+
+  <rect class="boxViolet" x="1216" y="600" width="122" height="68"/>
+  <text class="smallTitle" x="1277" y="625" text-anchor="middle">pre_text</text>
+  <text class="tiny" x="1277" y="646" text-anchor="middle">person/speed/</text>
+  <text class="tiny" x="1277" y="662" text-anchor="middle">head/body/arm/leg</text>
+
+  <path class="arrowThin" d="M1107 668 C1107 690, 1144 695, 1167 711"/>
+  <path class="arrowThin" d="M1277 668 C1277 690, 1226 695, 1202 711"/>
+
+  <rect class="box" x="1067" y="712" width="250" height="54"/>
+  <text class="smallTitle" x="1192" y="735" text-anchor="middle">frozen CLIP token embedding</text>
+  <text class="tiny" x="1192" y="754" text-anchor="middle">learnable ctx_subject / ctx_verb / ctx_speed / ...</text>
+
+  <path class="arrowThin" d="M1192 766 C1192 784, 1192 785, 1192 800"/>
+  <rect class="boxGreen" x="1067" y="800" width="250" height="36"/>
+  <text class="smallTitle" x="1192" y="824" text-anchor="middle">textTransEncoder -> xf_out, xf_proj</text>
+
+  <path class="arrowPurple" d="M1192 800 C1170 704, 989 455, 989 389"/>
+
+  <!-- Bottom legends and losses -->
+  <rect class="boxPink" x="910" y="420" width="150" height="43"/>
+  <text class="tiny" x="985" y="438" text-anchor="middle">training loss</text>
+  <text class="tiny" x="985" y="454" text-anchor="middle">MPJPE + 0.1 coarse MPJPE</text>
+
+  <path class="arrowThin" d="M1088 434 C1078 434, 1070 434, 1060 434"/>
+
+  <text class="tiny" x="54" y="878">Note: labels use exact project modules and tensors after the geometry-prompt modification. 3DHP-specific files remain separate: common/finepose_3dhp.py and common/mixste_finepose_3dhp.py.</text>
+</svg>
