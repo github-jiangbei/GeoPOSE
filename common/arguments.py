@@ -180,6 +180,12 @@ def parse_args():
                         help='scale used to normalize depth in geometry prompts')
     parser.add_argument('--geometry-pose-scale', default=1.0, type=float,
                         help='scale used to normalize coarse 3D pose in geometry prompts')
+    parser.add_argument('--bone-loss-weight', default=0.02, type=float,
+                        help='global weight for supervised bone/skeleton structure loss')
+    parser.add_argument('--bone-symmetry-loss-weight', default=0.1, type=float,
+                        help='relative weight for left/right bone length symmetry inside the bone loss')
+    parser.add_argument('--bone-temporal-loss-weight', default=0.1, type=float,
+                        help='relative weight for temporal bone length stability inside the bone loss')
     parser.add_argument('--debug', action='store_true',
                         default=False, help='debugging mode')
     parser.add_argument('--p2', action='store_true',
