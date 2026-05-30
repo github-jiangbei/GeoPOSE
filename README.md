@@ -75,7 +75,7 @@ python main.py -k cpn_ft_h36m_dbb -c checkpoint/model_h36m -gpu 0 --nolog
 ### MPI-INF-3DHP
 To train our model using the ground truth 2D poses as inputs, please run:
 ```bash
-python main_3dhp.py -c checkpoint/model_3dhp -gpu 0,1 --nolog
+python main_3dhp.py -c checkpoint/model_3dhp -gpu 0 --nolog
 ```
 
 ### Pretrained Models
