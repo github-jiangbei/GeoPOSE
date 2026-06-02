@@ -76,11 +76,11 @@ class TemporalConvPose(nn.Module):
 
 class GeometryPromptBuilder(nn.Module):
     """
-    Converts a root-relative 3D pose estimate and camera geometry into per-joint prompt tokens.
+    Converts the coarse TCN pose and camera geometry into per-joint prompt tokens.
 
     Prompt channels:
       projection error xy, projection error norm, camera ray xyz, absolute depth,
-      confidence, conditioning 3D xyz, projected 2D xy, observed 2D xy.
+      confidence, coarse 3D xyz, projected 2D xy, observed 2D xy.
     """
 
     prompt_dim = 15

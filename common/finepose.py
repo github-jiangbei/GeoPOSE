@@ -62,7 +62,6 @@ class FinePOSE(nn.Module):
         self.joints_right = joints_right
         self.is_train = is_train
         self.use_geometry_prompt = getattr(args, 'geometry_prompt', True)
-        self.dynamic_geometry_prompt = getattr(args, 'dynamic_geometry_prompt', True)
 
         # build diffusion
         timesteps = args.timestep
@@ -172,55 +171,6 @@ class FinePOSE(nn.Module):
         )
         return geometry_prompt, coarse_pose
 
-    def build_geometry_prompt_from_pose(self, input_2d, pose_3d, camera_params=None, root_trajectory=None):
-        if not self.use_geometry_prompt:
-            return None
-        if pose_3d.dim() == 4:
-            return self.geometry_prompt_builder(
-                input_2d,
-                pose_3d,
-                camera_params=camera_params,
-                root_trajectory=root_trajectory,
-            )
-        if pose_3d.dim() != 5:
-            raise ValueError('Dynamic geometry prompt expects pose shape (B,F,J,3) or (B,H,F,J,3).')
-
-        b, h, f, j, c = pose_3d.shape
-        input_2d = input_2d[:, None].expand(b, h, f, j, input_2d.shape[-1]).reshape(b * h, f, j, input_2d.shape[-1])
-        pose_3d = pose_3d.reshape(b * h, f, j, c)
-
-        if camera_params is not None:
-            if camera_params.shape[0] == 1 and b != 1:
-                camera_params = camera_params.repeat(b, 1)
-            elif camera_params.shape[0] != b:
-                raise ValueError('Camera batch size must be 1 or match the pose batch size.')
-            camera_params = camera_params[:, None].expand(b, h, camera_params.shape[-1]).reshape(b * h, camera_params.shape[-1])
-        if root_trajectory is not None:
-            if root_trajectory.shape[0] == 1 and b != 1:
-                repeat_shape = [b] + [1] * (root_trajectory.dim() - 1)
-                root_trajectory = root_trajectory.repeat(*repeat_shape)
-            elif root_trajectory.shape[0] != b:
-                raise ValueError('Root trajectory batch size must be 1 or match the pose batch size.')
-            if root_trajectory.dim() == 3:
-                root_trajectory = root_trajectory.unsqueeze(-2)
-            root_trajectory = root_trajectory[:, None].expand(b, h, f, 1, 3).reshape(b * h, f, 1, 3)
-
-        geometry_prompt = self.geometry_prompt_builder(
-            input_2d,
-            pose_3d,
-            camera_params=camera_params,
-            root_trajectory=root_trajectory,
-        )
-        return geometry_prompt.reshape(b, h, f, j, -1)
-
-    def flip_pose(self, pose_3d):
-        pose_3d = pose_3d.clone()
-        pose_3d[..., 0] *= -1
-        pose_3d[..., self.joints_left + self.joints_right, :] = pose_3d[
-            ..., self.joints_right + self.joints_left, :
-        ].clone()
-        return pose_3d
-
 
     def predict_noise_from_start(self, x_t, t, x0):
         return (
@@ -326,13 +276,6 @@ class FinePOSE(nn.Module):
             )
             pred_noise, x_start = preds.pred_noise, preds.pred_x_start
             preds_all.append(x_start)
-            if self.dynamic_geometry_prompt:
-                geometry_prompt = self.build_geometry_prompt_from_pose(
-                    inputs_2d,
-                    x_start,
-                    camera_params=camera_params,
-                    root_trajectory=root_trajectory,
-                )
 
             if time_next < 0:
                 img = x_start
@@ -406,19 +349,6 @@ class FinePOSE(nn.Module):
             pred_noise, x_start = preds.pred_noise, preds.pred_x_start
 
             preds_all.append(x_start)
-            if self.dynamic_geometry_prompt:
-                geometry_prompt = self.build_geometry_prompt_from_pose(
-                    inputs_2d,
-                    x_start,
-                    camera_params=camera_params,
-                    root_trajectory=root_trajectory,
-                )
-                geometry_prompt_flip = self.build_geometry_prompt_from_pose(
-                    input_2d_flip,
-                    self.flip_pose(x_start),
-                    camera_params=self.flip_camera_params(camera_params),
-                    root_trajectory=self.flip_root_trajectory(root_trajectory),
-                )
 
             if time_next < 0:
                 img = x_start

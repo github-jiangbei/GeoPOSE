@@ -387,10 +387,7 @@ class  MixSTE2(nn.Module):
             x = self.Spatial_patch_to_embedding(x)
             x = x + self.Spatial_pos_embed
             if self.Geometry_prompt_to_embedding is not None and geometry_prompt is not None:
-                if geometry_prompt.dim() == 4:
-                    geometry_prompt = geometry_prompt[:, None].repeat(1, h, 1, 1, 1)
-                elif geometry_prompt.dim() != 5:
-                    raise ValueError('Geometry prompt must have shape (B,F,J,C) or (B,H,F,J,C).')
+                geometry_prompt = geometry_prompt[:, None].repeat(1, h, 1, 1, 1)
                 geometry_prompt = rearrange(geometry_prompt, 'b h f n c -> (b h f) n c')
                 x = x + self.Geometry_prompt_to_embedding(geometry_prompt)
             time_embed = self.time_mlp(t)[:, None, None, None, :]

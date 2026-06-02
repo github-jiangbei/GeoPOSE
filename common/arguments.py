@@ -166,8 +166,6 @@ def parse_args():
                         default=1, metavar='N')  # 300
     parser.add_argument('--disable-geometry-prompt', dest='geometry_prompt', action='store_false',
                         help='disable TCN-based geometry prompt conditioning')
-    parser.add_argument('--disable-dynamic-geometry-prompt', dest='dynamic_geometry_prompt', action='store_false',
-                        help='keep using the initial TCN geometry prompt at every denoising step')
     parser.add_argument('--geometry-tcn-channels', default=256, type=int,
                         help='hidden channels of the coarse TCN pose estimator')
     parser.add_argument('--geometry-tcn-blocks', default=4, type=int,
@@ -197,7 +195,6 @@ def parse_args():
     parser.set_defaults(data_augmentation=True)
     parser.set_defaults(test_time_augmentation=True)
     parser.set_defaults(geometry_prompt=True)
-    parser.set_defaults(dynamic_geometry_prompt=True)
 
     args = parser.parse_args()
     # Check invalid configuration
