@@ -2,7 +2,6 @@ from matplotlib.pyplot import bone
 import torch
 import numpy as np
 import torch.nn as nn
-import torch.nn.functional as F
 
 def mpjpe(predicted, target, return_joints_err=False):
     """
@@ -18,82 +17,6 @@ def mpjpe(predicted, target, return_joints_err=False):
         errors = rearrange(errors, 'B T N -> N (B T)')
         errors = torch.mean(errors, dim=-1).cpu().numpy().reshape(-1) * 1000
         return torch.mean(torch.norm(predicted - target, dim=len(target.shape)-1)), errors
-
-def _bone_parent_tensor(parents, device):
-    if torch.is_tensor(parents):
-        return parents.to(device=device, dtype=torch.long)
-    return torch.as_tensor(parents, device=device, dtype=torch.long)
-
-def bone_lengths(poses, parents, eps=1e-8):
-    """
-    Compute lengths for all skeleton edges defined by parent indices.
-    Supports pose tensors shaped (..., joints, 3).
-    """
-    parents = _bone_parent_tensor(parents, poses.device)
-    children = torch.nonzero(parents >= 0, as_tuple=False).squeeze(-1)
-    parent_joints = parents[children]
-    bone_vec = poses[..., children, :] - poses[..., parent_joints, :]
-    return torch.sqrt(torch.sum(bone_vec * bone_vec, dim=-1).clamp(min=eps))
-
-def bone_length_loss(predicted, target, parents):
-    """
-    Penalize predicted bone lengths that differ from the ground-truth skeleton.
-    """
-    assert predicted.shape == target.shape
-    pred_lengths = bone_lengths(predicted, parents)
-    target_lengths = bone_lengths(target, parents).detach()
-    return F.smooth_l1_loss(pred_lengths, target_lengths)
-
-def bone_symmetry_loss(predicted, parents, joints_left, joints_right):
-    """
-    Encourage mirrored left/right limbs to keep similar lengths.
-    """
-    if joints_left is None or joints_right is None or len(joints_left) == 0:
-        return predicted.new_zeros(())
-
-    parents_tensor = _bone_parent_tensor(parents, predicted.device)
-    mirror = {}
-    for left_joint, right_joint in zip(joints_left, joints_right):
-        mirror[int(left_joint)] = int(right_joint)
-        mirror[int(right_joint)] = int(left_joint)
-
-    left_edges = []
-    right_edges = []
-    for left_child in joints_left:
-        left_child = int(left_child)
-        left_parent = int(parents_tensor[left_child].item())
-        if left_parent < 0:
-            continue
-        right_child = mirror.get(left_child)
-        right_parent = mirror.get(left_parent, left_parent)
-        if right_child is None or right_parent < 0:
-            continue
-        if int(parents_tensor[right_child].item()) != right_parent:
-            continue
-        left_edges.append((left_child, left_parent))
-        right_edges.append((right_child, right_parent))
-
-    if len(left_edges) == 0:
-        return predicted.new_zeros(())
-
-    left_child = torch.as_tensor([edge[0] for edge in left_edges], device=predicted.device, dtype=torch.long)
-    left_parent = torch.as_tensor([edge[1] for edge in left_edges], device=predicted.device, dtype=torch.long)
-    right_child = torch.as_tensor([edge[0] for edge in right_edges], device=predicted.device, dtype=torch.long)
-    right_parent = torch.as_tensor([edge[1] for edge in right_edges], device=predicted.device, dtype=torch.long)
-
-    left_lengths = torch.norm(predicted[..., left_child, :] - predicted[..., left_parent, :], dim=-1)
-    right_lengths = torch.norm(predicted[..., right_child, :] - predicted[..., right_parent, :], dim=-1)
-    return F.smooth_l1_loss(left_lengths, right_lengths)
-
-def bone_temporal_consistency_loss(predicted, parents):
-    """
-    Penalize frame-to-frame bone-length jitter inside a training clip.
-    Expected training shape is (batch, frames, joints, 3).
-    """
-    if predicted.dim() < 4 or predicted.shape[1] < 2:
-        return predicted.new_zeros(())
-    lengths = bone_lengths(predicted, parents)
-    return F.smooth_l1_loss(lengths[:, 1:], lengths[:, :-1])
 
 def mpjpe_diffusion_all_min(predicted, target, mean_pos=False):
     """

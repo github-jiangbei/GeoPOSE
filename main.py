@@ -231,7 +231,6 @@ min_loss = args.min_loss
 width = cam['res_w']
 height = cam['res_h']
 num_joints = keypoints_metadata['num_joints']
-bone_parents = torch.from_numpy(dataset.skeleton().parents().astype('int64'))
 
 
 model_pos_train = FinePOSE(args, joints_left, joints_right, is_train=True)
@@ -362,7 +361,6 @@ if not args.evaluate:
     losses_3d_pos_train = []
     losses_3d_diff_train = []
     losses_3d_coarse_train = []
-    losses_3d_bone_train = []
     losses_3d_train_eval = []
     losses_3d_valid = []
     losses_3d_depth_valid = []
@@ -409,7 +407,6 @@ if not args.evaluate:
         epoch_loss_3d_pos_train = 0
         epoch_loss_3d_diff_train = 0
         epoch_loss_3d_coarse_train = 0
-        epoch_loss_3d_bone_train = 0
         epoch_loss_traj_train = 0
         epoch_loss_2d_train_unlabeled = 0
         N = 0
@@ -473,35 +470,7 @@ if not args.evaluate:
             else:
                 loss_3d_coarse = torch.zeros_like(loss_3d_pos)
 
-            if args.bone_length_term and args.bone_loss_weight > 0:
-                bone_parents_train = bone_parents.to(inputs_3d.device)
-                loss_bone_length = bone_length_loss(predicted_3d_pos, inputs_3d, bone_parents_train)
-                if args.bone_symmetry_loss_weight > 0:
-                    loss_bone_symmetry = bone_symmetry_loss(
-                        predicted_3d_pos,
-                        bone_parents_train,
-                        joints_left,
-                        joints_right,
-                    )
-                else:
-                    loss_bone_symmetry = torch.zeros_like(loss_3d_pos)
-                if args.bone_temporal_loss_weight > 0:
-                    loss_bone_temporal = bone_temporal_consistency_loss(predicted_3d_pos, bone_parents_train)
-                else:
-                    loss_bone_temporal = torch.zeros_like(loss_3d_pos)
-                loss_bone_structure = (
-                    loss_bone_length
-                    + args.bone_symmetry_loss_weight * loss_bone_symmetry
-                    + args.bone_temporal_loss_weight * loss_bone_temporal
-                )
-            else:
-                loss_bone_structure = torch.zeros_like(loss_3d_pos)
-
-            loss_total = (
-                loss_3d_pos
-                + args.geometry_coarse_loss_weight * loss_3d_coarse
-                + args.bone_loss_weight * loss_bone_structure
-            )
+            loss_total = loss_3d_pos + args.geometry_coarse_loss_weight * loss_3d_coarse
             
             loss_total = torch.mean(loss_total)
             loss_total.backward()
@@ -509,7 +478,6 @@ if not args.evaluate:
             epoch_loss_3d_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_total.item()
             epoch_loss_3d_pos_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_3d_pos.item()
             epoch_loss_3d_coarse_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_3d_coarse.item()
-            epoch_loss_3d_bone_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_bone_structure.item()
             N += inputs_3d.shape[0] * inputs_3d.shape[1]
 
             optimizer.step()
@@ -523,7 +491,6 @@ if not args.evaluate:
         losses_3d_train.append(epoch_loss_3d_train / N)
         losses_3d_pos_train.append(epoch_loss_3d_pos_train / N)
         losses_3d_coarse_train.append(epoch_loss_3d_coarse_train / N)
-        losses_3d_bone_train.append(epoch_loss_3d_bone_train / N)
 
         # End-of-epoch evaluation
         with torch.no_grad():
@@ -617,51 +584,47 @@ if not args.evaluate:
         elapsed = (time() - start_time) / 60
 
         if args.no_eval:
-            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f' % (
+            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f' % (
                 epoch + 1,
                 elapsed,
                 lr,
                 losses_3d_train[-1] * 1000,
                 losses_3d_pos_train[-1] * 1000,
-                losses_3d_coarse_train[-1] * 1000,
-                losses_3d_bone_train[-1] * 1000
+                losses_3d_coarse_train[-1] * 1000
             ))
 
             log_path = os.path.join(args.checkpoint, 'training_log.txt')
             f = open(log_path, mode='a')
-            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f\n' % (
+            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f\n' % (
                 epoch + 1,
                 elapsed,
                 lr,
                 losses_3d_train[-1] * 1000,
                 losses_3d_pos_train[-1] * 1000,
-                losses_3d_coarse_train[-1] * 1000,
-                losses_3d_bone_train[-1] * 1000
+                losses_3d_coarse_train[-1] * 1000
             ))
             f.close()
 
         else:
-            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f 3d_pos_valid %f' % (
+            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_pos_valid %f' % (
                 epoch + 1,
                 elapsed,
                 lr,
                 losses_3d_train[-1] * 1000,
                 losses_3d_pos_train[-1] * 1000,
                 losses_3d_coarse_train[-1] * 1000,
-                losses_3d_bone_train[-1] * 1000,
                 losses_3d_valid[-1][0] * 1000
             ))
 
             log_path = os.path.join(args.checkpoint, 'training_log.txt')
             f = open(log_path, mode='a')
-            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f 3d_pos_valid %f\n' % (
+            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_pos_valid %f\n' % (
                 epoch + 1,
                 elapsed,
                 lr,
                 losses_3d_train[-1] * 1000,
                 losses_3d_pos_train[-1] * 1000,
                 losses_3d_coarse_train[-1] * 1000,
-                losses_3d_bone_train[-1] * 1000,
                 losses_3d_valid[-1][0] * 1000
             ))
             f.close()
@@ -671,7 +634,6 @@ if not args.evaluate:
         if not args.nolog:
             writer.add_scalar("Loss/3d training loss", losses_3d_train[-1] * 1000, epoch+1)
             writer.add_scalar("Loss/3d coarse TCN loss", losses_3d_coarse_train[-1] * 1000, epoch+1)
-            writer.add_scalar("Loss/3d bone structure loss", losses_3d_bone_train[-1] * 1000, epoch+1)
             writer.add_scalar("Parameters/learing rate", lr, epoch+1)
             writer.add_scalar('Parameters/training time per epoch', elapsed, epoch+1)
         # Decay learning rate exponentially
