@@ -475,7 +475,12 @@ if not args.evaluate:
 
             if args.bone_length_term and args.bone_loss_weight > 0:
                 bone_parents_train = bone_parents.to(inputs_3d.device)
-                loss_bone_length = bone_length_loss(predicted_3d_pos, inputs_3d, bone_parents_train)
+                loss_bone_structure = bone_length_loss(predicted_3d_pos, inputs_3d, bone_parents_train)
+                if args.bone_direction_loss_weight > 0:
+                    loss_bone_direction = bone_direction_loss(predicted_3d_pos, inputs_3d, bone_parents_train)
+                    loss_bone_structure = loss_bone_structure + args.bone_direction_loss_weight * loss_bone_direction
+                else:
+                    loss_bone_direction = torch.zeros_like(loss_3d_pos)
                 if args.bone_symmetry_loss_weight > 0:
                     loss_bone_symmetry = bone_symmetry_loss(
                         predicted_3d_pos,
@@ -483,17 +488,14 @@ if not args.evaluate:
                         joints_left,
                         joints_right,
                     )
+                    loss_bone_structure = loss_bone_structure + args.bone_symmetry_loss_weight * loss_bone_symmetry
                 else:
                     loss_bone_symmetry = torch.zeros_like(loss_3d_pos)
                 if args.bone_temporal_loss_weight > 0:
                     loss_bone_temporal = bone_temporal_consistency_loss(predicted_3d_pos, bone_parents_train)
+                    loss_bone_structure = loss_bone_structure + args.bone_temporal_loss_weight * loss_bone_temporal
                 else:
                     loss_bone_temporal = torch.zeros_like(loss_3d_pos)
-                loss_bone_structure = (
-                    loss_bone_length
-                    + args.bone_symmetry_loss_weight * loss_bone_symmetry
-                    + args.bone_temporal_loss_weight * loss_bone_temporal
-                )
             else:
                 loss_bone_structure = torch.zeros_like(loss_3d_pos)
 

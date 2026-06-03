@@ -35,6 +35,16 @@ def bone_lengths(poses, parents, eps=1e-8):
     bone_vec = poses[..., children, :] - poses[..., parent_joints, :]
     return torch.sqrt(torch.sum(bone_vec * bone_vec, dim=-1).clamp(min=eps))
 
+def bone_vectors(poses, parents):
+    """
+    Compute child-parent vectors for all skeleton edges.
+    Supports pose tensors shaped (..., joints, 3).
+    """
+    parents = _bone_parent_tensor(parents, poses.device)
+    children = torch.nonzero(parents >= 0, as_tuple=False).squeeze(-1)
+    parent_joints = parents[children]
+    return poses[..., children, :] - poses[..., parent_joints, :]
+
 def bone_length_loss(predicted, target, parents):
     """
     Penalize predicted bone lengths that differ from the ground-truth skeleton.
@@ -43,6 +53,17 @@ def bone_length_loss(predicted, target, parents):
     pred_lengths = bone_lengths(predicted, parents)
     target_lengths = bone_lengths(target, parents).detach()
     return F.smooth_l1_loss(pred_lengths, target_lengths)
+
+def bone_direction_loss(predicted, target, parents, eps=1e-8):
+    """
+    Penalize bone orientation errors after normalizing each child-parent vector.
+    This focuses on pose shape and joint configuration rather than bone scale.
+    """
+    assert predicted.shape == target.shape
+    pred_dirs = F.normalize(bone_vectors(predicted, parents), dim=-1, eps=eps)
+    target_dirs = F.normalize(bone_vectors(target, parents).detach(), dim=-1, eps=eps)
+    cosine = torch.sum(pred_dirs * target_dirs, dim=-1).clamp(min=-1.0, max=1.0)
+    return torch.mean(1.0 - cosine)
 
 def bone_symmetry_loss(predicted, parents, joints_left, joints_right):
     """
