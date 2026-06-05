@@ -74,6 +74,96 @@ class TemporalConvPose(nn.Module):
         return x - x[:, :, :1]
 
 
+class RootDepthEstimator(nn.Module):
+    """
+    Predicts camera-space root depth from the 2D pose and back-projects the root
+    joint through the camera ray. This avoids using GT root trajectory as a
+    geometry-prompt condition at evaluation time.
+    """
+
+    def __init__(
+        self,
+        num_joints=17,
+        in_features=3,
+        hidden_channels=128,
+        num_blocks=2,
+        kernel_size=3,
+        dropout=0.1,
+        min_depth=0.5,
+        max_depth=10.0,
+        root_joint=0,
+    ):
+        super().__init__()
+        self.num_joints = num_joints
+        self.in_features = in_features
+        self.min_depth = float(min_depth)
+        self.max_depth = float(max_depth)
+        self.root_joint = int(root_joint)
+
+        self.input_proj = nn.Conv1d(num_joints * in_features, hidden_channels, 1)
+        self.blocks = nn.ModuleList(
+            [
+                TemporalResidualBlock(
+                    hidden_channels,
+                    kernel_size=kernel_size,
+                    dilation=2 ** i,
+                    dropout=dropout,
+                )
+                for i in range(num_blocks)
+            ]
+        )
+        self.output_proj = nn.Conv1d(hidden_channels, 1, 1)
+
+    @staticmethod
+    def _match_batch(tensor, batch_size):
+        if tensor is None:
+            return None
+        if tensor.shape[0] == batch_size:
+            return tensor
+        if tensor.shape[0] == 1:
+            repeat_shape = [batch_size] + [1] * (tensor.dim() - 1)
+            return tensor.repeat(*repeat_shape)
+        raise ValueError('Camera batch size must be 1 or match the pose batch size.')
+
+    def _predict_depth(self, input_2d):
+        b, f, j, _ = input_2d.shape
+        xy = input_2d[..., :2]
+        if input_2d.shape[-1] > 2:
+            confidence = input_2d[..., 2:3].clamp(0.0, 1.0)
+        else:
+            confidence = torch.ones(b, f, j, 1, device=input_2d.device, dtype=input_2d.dtype)
+
+        x = torch.cat((xy, confidence), dim=-1)
+        x = x.reshape(b, f, j * self.in_features).transpose(1, 2)
+        x = self.input_proj(x)
+        for block in self.blocks:
+            x = block(x)
+
+        depth_logits = self.output_proj(x).transpose(1, 2).reshape(b, f, 1, 1)
+        depth = self.min_depth + (self.max_depth - self.min_depth) * torch.sigmoid(depth_logits)
+        return depth
+
+    def _back_project_root(self, input_2d, root_depth, camera_params):
+        b, f, _, _ = input_2d.shape
+        root_xy = input_2d[:, :, self.root_joint:self.root_joint + 1, :2]
+
+        if camera_params is None:
+            root_xyz = torch.cat((root_xy * root_depth, root_depth), dim=-1)
+            return root_xyz
+
+        camera_params = self._match_batch(camera_params, b)
+        camera_params = camera_params.to(device=input_2d.device, dtype=input_2d.dtype)
+        focal = camera_params[:, :2].abs().clamp(min=1e-6).view(b, 1, 1, 2)
+        center = camera_params[:, 2:4].view(b, 1, 1, 2)
+        root_xy_camera = (root_xy - center) / focal * root_depth
+        return torch.cat((root_xy_camera, root_depth), dim=-1)
+
+    def forward(self, input_2d, camera_params=None):
+        root_depth = self._predict_depth(input_2d)
+        root_trajectory = self._back_project_root(input_2d, root_depth, camera_params)
+        return root_trajectory, root_depth
+
+
 class GeometryPromptBuilder(nn.Module):
     """
     Converts the coarse TCN pose and camera geometry into per-joint prompt tokens.

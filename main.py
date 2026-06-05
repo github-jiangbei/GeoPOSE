@@ -363,6 +363,7 @@ if not args.evaluate:
     losses_3d_diff_train = []
     losses_3d_coarse_train = []
     losses_3d_bone_train = []
+    losses_root_depth_train = []
     losses_3d_train_eval = []
     losses_3d_valid = []
     losses_3d_depth_valid = []
@@ -410,6 +411,7 @@ if not args.evaluate:
         epoch_loss_3d_diff_train = 0
         epoch_loss_3d_coarse_train = 0
         epoch_loss_3d_bone_train = 0
+        epoch_loss_root_depth_train = 0
         epoch_loss_traj_train = 0
         epoch_loss_2d_train_unlabeled = 0
         N = 0
@@ -462,7 +464,6 @@ if not args.evaluate:
                 input_text,
                 pre_text_tensor_train,
                 camera_params=cameras_train,
-                root_trajectory=inputs_traj,
                 return_aux=True,
             )
 
@@ -499,10 +500,18 @@ if not args.evaluate:
             else:
                 loss_bone_structure = torch.zeros_like(loss_3d_pos)
 
+            pred_root_depth = aux_outputs.get('root_depth') if isinstance(aux_outputs, dict) else None
+            if pred_root_depth is not None and args.root_depth_loss_weight > 0:
+                target_root_depth = inputs_traj[..., 2:3].detach().clamp(min=1e-3)
+                loss_root_depth = F.smooth_l1_loss(pred_root_depth, target_root_depth)
+            else:
+                loss_root_depth = torch.zeros_like(loss_3d_pos)
+
             loss_total = (
                 loss_3d_pos
                 + args.geometry_coarse_loss_weight * loss_3d_coarse
                 + args.bone_loss_weight * loss_bone_structure
+                + args.root_depth_loss_weight * loss_root_depth
             )
             
             loss_total = torch.mean(loss_total)
@@ -512,6 +521,7 @@ if not args.evaluate:
             epoch_loss_3d_pos_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_3d_pos.item()
             epoch_loss_3d_coarse_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_3d_coarse.item()
             epoch_loss_3d_bone_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_bone_structure.item()
+            epoch_loss_root_depth_train += inputs_3d.shape[0] * inputs_3d.shape[1] * loss_root_depth.item()
             N += inputs_3d.shape[0] * inputs_3d.shape[1]
 
             optimizer.step()
@@ -526,6 +536,7 @@ if not args.evaluate:
         losses_3d_pos_train.append(epoch_loss_3d_pos_train / N)
         losses_3d_coarse_train.append(epoch_loss_3d_coarse_train / N)
         losses_3d_bone_train.append(epoch_loss_3d_bone_train / N)
+        losses_root_depth_train.append(epoch_loss_root_depth_train / N)
 
         # End-of-epoch evaluation
         with torch.no_grad():
@@ -590,7 +601,6 @@ if not args.evaluate:
                         input_text,
                         pre_text_tensor_valid,
                         camera_params=cam_valid,
-                        root_trajectory=inputs_traj,
                         input_2d_flip=inputs_2d_flip,
                     )
 
@@ -619,31 +629,7 @@ if not args.evaluate:
         elapsed = (time() - start_time) / 60
 
         if args.no_eval:
-            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f' % (
-                epoch + 1,
-                elapsed,
-                lr,
-                losses_3d_train[-1] * 1000,
-                losses_3d_pos_train[-1] * 1000,
-                losses_3d_coarse_train[-1] * 1000,
-                losses_3d_bone_train[-1] * 1000
-            ))
-
-            log_path = os.path.join(args.checkpoint, 'training_log.txt')
-            f = open(log_path, mode='a')
-            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f\n' % (
-                epoch + 1,
-                elapsed,
-                lr,
-                losses_3d_train[-1] * 1000,
-                losses_3d_pos_train[-1] * 1000,
-                losses_3d_coarse_train[-1] * 1000,
-                losses_3d_bone_train[-1] * 1000
-            ))
-            f.close()
-
-        else:
-            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f 3d_pos_valid %f' % (
+            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f' % (
                 epoch + 1,
                 elapsed,
                 lr,
@@ -651,12 +637,39 @@ if not args.evaluate:
                 losses_3d_pos_train[-1] * 1000,
                 losses_3d_coarse_train[-1] * 1000,
                 losses_3d_bone_train[-1] * 1000,
+                losses_root_depth_train[-1] * 1000
+            ))
+
+            log_path = os.path.join(args.checkpoint, 'training_log.txt')
+            f = open(log_path, mode='a')
+            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f\n' % (
+                epoch + 1,
+                elapsed,
+                lr,
+                losses_3d_train[-1] * 1000,
+                losses_3d_pos_train[-1] * 1000,
+                losses_3d_coarse_train[-1] * 1000,
+                losses_3d_bone_train[-1] * 1000,
+                losses_root_depth_train[-1] * 1000
+            ))
+            f.close()
+
+        else:
+            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f 3d_pos_valid %f' % (
+                epoch + 1,
+                elapsed,
+                lr,
+                losses_3d_train[-1] * 1000,
+                losses_3d_pos_train[-1] * 1000,
+                losses_3d_coarse_train[-1] * 1000,
+                losses_3d_bone_train[-1] * 1000,
+                losses_root_depth_train[-1] * 1000,
                 losses_3d_valid[-1][0] * 1000
             ))
 
             log_path = os.path.join(args.checkpoint, 'training_log.txt')
             f = open(log_path, mode='a')
-            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f 3d_pos_valid %f\n' % (
+            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f 3d_pos_valid %f\n' % (
                 epoch + 1,
                 elapsed,
                 lr,
@@ -664,6 +677,7 @@ if not args.evaluate:
                 losses_3d_pos_train[-1] * 1000,
                 losses_3d_coarse_train[-1] * 1000,
                 losses_3d_bone_train[-1] * 1000,
+                losses_root_depth_train[-1] * 1000,
                 losses_3d_valid[-1][0] * 1000
             ))
             f.close()
@@ -674,6 +688,7 @@ if not args.evaluate:
             writer.add_scalar("Loss/3d training loss", losses_3d_train[-1] * 1000, epoch+1)
             writer.add_scalar("Loss/3d coarse TCN loss", losses_3d_coarse_train[-1] * 1000, epoch+1)
             writer.add_scalar("Loss/3d bone structure loss", losses_3d_bone_train[-1] * 1000, epoch+1)
+            writer.add_scalar("Loss/root depth loss", losses_root_depth_train[-1] * 1000, epoch+1)
             writer.add_scalar("Parameters/learing rate", lr, epoch+1)
             writer.add_scalar('Parameters/training time per epoch', elapsed, epoch+1)
         # Decay learning rate exponentially
@@ -875,15 +890,21 @@ def evaluate(test_generator, action=None, return_predictions=False, use_trajecto
 
                 if newmodel is not None:
                     predicted_3d_pos_single = model_eval(inputs_2d_single, inputs_3d_single, input_text_single, pre_text_tensor_valid_single, input_2d_flip=inputs_2d_flip_single)
+                    pred_root_traj_single = None
                 else:
-                    predicted_3d_pos_single = model_eval(
+                    predicted_3d_pos_single, aux_outputs_single = model_eval(
                         inputs_2d_single,
                         inputs_3d_single,
                         input_text_single,
                         pre_text_tensor_valid_single,
                         camera_params=cam_single,
-                        root_trajectory=inputs_traj_single,
                         input_2d_flip=inputs_2d_flip_single,
+                        return_aux=True,
+                    )
+                    pred_root_traj_single = (
+                        aux_outputs_single.get('root_trajectory')
+                        if isinstance(aux_outputs_single, dict)
+                        else None
                     )
 
                 predicted_3d_pos_single[:, :, :, :, 0] = 0
@@ -893,8 +914,11 @@ def evaluate(test_generator, action=None, return_predictions=False, use_trajecto
 
                 # 2d reprojection
                 b_sz, t_sz, h_sz, f_sz, j_sz, c_sz =predicted_3d_pos_single.shape
-                inputs_traj_single_all = inputs_traj_single.unsqueeze(1).unsqueeze(1).repeat(1, t_sz, h_sz, 1, 1, 1)
-                predicted_3d_pos_abs_single = predicted_3d_pos_single + inputs_traj_single_all
+                root_for_reproj_single = pred_root_traj_single
+                if root_for_reproj_single is None:
+                    root_for_reproj_single = inputs_traj_single
+                root_for_reproj_single_all = root_for_reproj_single.unsqueeze(1).unsqueeze(1).repeat(1, t_sz, h_sz, 1, 1, 1)
+                predicted_3d_pos_abs_single = predicted_3d_pos_single + root_for_reproj_single_all
                 predicted_3d_pos_abs_single = predicted_3d_pos_abs_single.reshape(b_sz*t_sz*h_sz*f_sz, j_sz, c_sz)
                 if cam_single is None:
                     raise RuntimeError('Camera parameters are required for reprojection-based evaluation.')

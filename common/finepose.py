@@ -10,7 +10,7 @@ from torch import nn
 
 # from common.mixste import *
 from common.mixste_finepose import *
-from common.geometry_prompt import GeometryPromptBuilder, TemporalConvPose
+from common.geometry_prompt import GeometryPromptBuilder, RootDepthEstimator, TemporalConvPose
 
 __all__ = ["FinePOSE"]
 
@@ -128,10 +128,21 @@ class FinePOSE(nn.Module):
                 depth_scale=getattr(args, 'geometry_depth_scale', 10.0),
                 pose_scale=getattr(args, 'geometry_pose_scale', 1.0),
             )
+            self.root_trajectory_estimator = RootDepthEstimator(
+                num_joints=17,
+                hidden_channels=getattr(args, 'root_depth_tcn_channels', 128),
+                num_blocks=getattr(args, 'root_depth_tcn_blocks', 2),
+                kernel_size=getattr(args, 'root_depth_tcn_kernel', 3),
+                dropout=drop_path_rate,
+                min_depth=getattr(args, 'root_depth_min', 0.5),
+                max_depth=getattr(args, 'root_depth_max', 10.0),
+                root_joint=getattr(args, 'root_joint_index', 0),
+            )
             geometry_prompt_dim = self.geometry_prompt_builder.prompt_dim
         else:
             self.coarse_pose_estimator = None
             self.geometry_prompt_builder = None
+            self.root_trajectory_estimator = None
             geometry_prompt_dim = 0
 
         self.pose_estimator = MixSTE2(num_frame=self.frames, num_joints=17, in_chans=2, embed_dim_ratio=args.cs, depth=args.dep,
@@ -151,25 +162,18 @@ class FinePOSE(nn.Module):
         camera_params[..., 7] *= -1
         return camera_params
 
-    @staticmethod
-    def flip_root_trajectory(root_trajectory):
-        if root_trajectory is None:
-            return None
-        root_trajectory = root_trajectory.clone()
-        root_trajectory[..., 0] *= -1
-        return root_trajectory
-
-    def build_geometry_prompt(self, input_2d, camera_params=None, root_trajectory=None):
+    def build_geometry_prompt(self, input_2d, camera_params=None):
         if not self.use_geometry_prompt:
-            return None, None
+            return None, None, None, None
         coarse_pose = self.coarse_pose_estimator(input_2d)
+        pred_root_trajectory, root_depth = self.root_trajectory_estimator(input_2d, camera_params)
         geometry_prompt = self.geometry_prompt_builder(
             input_2d,
             coarse_pose,
             camera_params=camera_params,
-            root_trajectory=root_trajectory,
+            root_trajectory=pred_root_trajectory,
         )
-        return geometry_prompt, coarse_pose
+        return geometry_prompt, coarse_pose, pred_root_trajectory, root_depth
 
 
     def predict_noise_from_start(self, x_t, t, x0):
@@ -253,10 +257,9 @@ class FinePOSE(nn.Module):
         
         # original random noise
         img = torch.randn(shape, device=self.device)
-        geometry_prompt, _ = self.build_geometry_prompt(
+        geometry_prompt, _, _, _ = self.build_geometry_prompt(
             inputs_2d,
             camera_params=camera_params,
-            root_trajectory=root_trajectory,
         )
 
         ensemble_score, ensemble_label, ensemble_coord = [], [], []
@@ -319,15 +322,13 @@ class FinePOSE(nn.Module):
         img = torch.randn(shape, device=self.device)
         if input_2d_flip is None:
             input_2d_flip = inputs_2d
-        geometry_prompt, _ = self.build_geometry_prompt(
+        geometry_prompt, _, _, _ = self.build_geometry_prompt(
             inputs_2d,
             camera_params=camera_params,
-            root_trajectory=root_trajectory,
         )
-        geometry_prompt_flip, _ = self.build_geometry_prompt(
+        geometry_prompt_flip, _, _, _ = self.build_geometry_prompt(
             input_2d_flip,
             camera_params=self.flip_camera_params(camera_params),
-            root_trajectory=self.flip_root_trajectory(root_trajectory),
         )
 
         x_start = None
@@ -400,7 +401,6 @@ class FinePOSE(nn.Module):
                     input_text,
                     pre_text_tensor,
                     camera_params=camera_params,
-                    root_trajectory=root_trajectory,
                     input_2d_flip=input_2d_flip,
                 )
             else:
@@ -410,8 +410,17 @@ class FinePOSE(nn.Module):
                     input_text,
                     pre_text_tensor,
                     camera_params=camera_params,
-                    root_trajectory=root_trajectory,
                 )
+            if return_aux:
+                _, coarse_pose, root_trajectory_pred, root_depth = self.build_geometry_prompt(
+                    input_2d,
+                    camera_params=camera_params,
+                )
+                return results, {
+                    'coarse_pose': coarse_pose,
+                    'root_trajectory': root_trajectory_pred,
+                    'root_depth': root_depth,
+                }
             return results
 
         if self.is_train:
@@ -419,10 +428,9 @@ class FinePOSE(nn.Module):
             x_poses, noises, t = self.prepare_targets(input_3d)
             x_poses = x_poses.float()
             t = t.squeeze(-1)
-            geometry_prompt, coarse_pose = self.build_geometry_prompt(
+            geometry_prompt, coarse_pose, root_trajectory_pred, root_depth = self.build_geometry_prompt(
                 input_2d,
                 camera_params=camera_params,
-                root_trajectory=root_trajectory,
             )
 
             pred_pose = self.pose_estimator(
@@ -435,7 +443,11 @@ class FinePOSE(nn.Module):
             )
 
             if return_aux:
-                return pred_pose, {'coarse_pose': coarse_pose}
+                return pred_pose, {
+                    'coarse_pose': coarse_pose,
+                    'root_trajectory': root_trajectory_pred,
+                    'root_depth': root_depth,
+                }
 
             return pred_pose
 

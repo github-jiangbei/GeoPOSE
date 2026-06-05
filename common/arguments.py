@@ -180,6 +180,20 @@ def parse_args():
                         help='scale used to normalize depth in geometry prompts')
     parser.add_argument('--geometry-pose-scale', default=1.0, type=float,
                         help='scale used to normalize coarse 3D pose in geometry prompts')
+    parser.add_argument('--root-depth-loss-weight', default=0.05, type=float,
+                        help='auxiliary SmoothL1 loss weight for predicted camera-space root depth')
+    parser.add_argument('--root-depth-tcn-channels', default=128, type=int,
+                        help='hidden channels of the root-depth TCN estimator')
+    parser.add_argument('--root-depth-tcn-blocks', default=2, type=int,
+                        help='number of residual temporal blocks in the root-depth estimator')
+    parser.add_argument('--root-depth-tcn-kernel', default=3, type=int,
+                        help='temporal kernel size of the root-depth estimator')
+    parser.add_argument('--root-depth-min', default=0.5, type=float,
+                        help='minimum predicted camera-space root depth in meters')
+    parser.add_argument('--root-depth-max', default=10.0, type=float,
+                        help='maximum predicted camera-space root depth in meters')
+    parser.add_argument('--root-joint-index', default=0, type=int,
+                        help='root joint index used for root-ray back-projection')
     parser.add_argument('--bone-loss-weight', default=0.02, type=float,
                         help='global weight for supervised bone/skeleton structure loss')
     parser.add_argument('--bone-direction-loss-weight', default=0.2, type=float,
