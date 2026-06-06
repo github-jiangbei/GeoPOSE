@@ -29,6 +29,7 @@ import collections
 
 from common.finepose import *
 
+from common.adaptive_loss import EMALossNormalizer
 from common.loss import *
 from common.generators import ChunkedGenerator_Seq, UnchunkedGenerator_Seq
 from time import time
@@ -356,6 +357,13 @@ if not args.evaluate:
 
     lr = args.learning_rate
     optimizer = optim.AdamW(model_pos_train.parameters(), lr=lr, weight_decay=0.1)
+    loss_normalizer = EMALossNormalizer(
+        enabled=args.adaptive_loss_normalization,
+        decay=args.adaptive_loss_ema_decay,
+        eps=args.adaptive_loss_eps,
+        min_scale=args.adaptive_loss_min_scale,
+        max_scale=args.adaptive_loss_max_scale,
+    )
 
     lr_decay = args.lr_decay
     losses_3d_train = []
@@ -389,6 +397,7 @@ if not args.evaluate:
             try:
                 optimizer.load_state_dict(checkpoint['optimizer'])
                 train_generator.set_random_state(checkpoint['random_state'])
+                loss_normalizer.load_state_dict(checkpoint.get('loss_normalizer'))
             except ValueError as exc:
                 print('WARNING: optimizer state is incompatible with the geometry-prompt parameters. Reinitializing optimizer.')
                 print('WARNING:', exc)
@@ -509,9 +518,9 @@ if not args.evaluate:
 
             loss_total = (
                 loss_3d_pos
-                + args.geometry_coarse_loss_weight * loss_3d_coarse
-                + args.bone_loss_weight * loss_bone_structure
-                + args.root_depth_loss_weight * loss_root_depth
+                + loss_normalizer.weighted('coarse', loss_3d_coarse, args.geometry_coarse_loss_weight)
+                + loss_normalizer.weighted('bone', loss_bone_structure, args.bone_loss_weight)
+                + loss_normalizer.weighted('root_depth', loss_root_depth, args.root_depth_loss_weight)
             )
             
             loss_total = torch.mean(loss_total)
@@ -627,35 +636,21 @@ if not args.evaluate:
 
 
         elapsed = (time() - start_time) / 60
+        effective_weight_coarse = loss_normalizer.last_effective_weights.get(
+            'coarse',
+            args.geometry_coarse_loss_weight,
+        )
+        effective_weight_bone = loss_normalizer.last_effective_weights.get(
+            'bone',
+            args.bone_loss_weight,
+        )
+        effective_weight_root_depth = loss_normalizer.last_effective_weights.get(
+            'root_depth',
+            args.root_depth_loss_weight,
+        )
 
         if args.no_eval:
-            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f' % (
-                epoch + 1,
-                elapsed,
-                lr,
-                losses_3d_train[-1] * 1000,
-                losses_3d_pos_train[-1] * 1000,
-                losses_3d_coarse_train[-1] * 1000,
-                losses_3d_bone_train[-1] * 1000,
-                losses_root_depth_train[-1] * 1000
-            ))
-
-            log_path = os.path.join(args.checkpoint, 'training_log.txt')
-            f = open(log_path, mode='a')
-            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f\n' % (
-                epoch + 1,
-                elapsed,
-                lr,
-                losses_3d_train[-1] * 1000,
-                losses_3d_pos_train[-1] * 1000,
-                losses_3d_coarse_train[-1] * 1000,
-                losses_3d_bone_train[-1] * 1000,
-                losses_root_depth_train[-1] * 1000
-            ))
-            f.close()
-
-        else:
-            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f 3d_pos_valid %f' % (
+            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f w_coarse %f w_bone %f w_root_depth %f' % (
                 epoch + 1,
                 elapsed,
                 lr,
@@ -664,12 +659,47 @@ if not args.evaluate:
                 losses_3d_coarse_train[-1] * 1000,
                 losses_3d_bone_train[-1] * 1000,
                 losses_root_depth_train[-1] * 1000,
+                effective_weight_coarse,
+                effective_weight_bone,
+                effective_weight_root_depth
+            ))
+
+            log_path = os.path.join(args.checkpoint, 'training_log.txt')
+            f = open(log_path, mode='a')
+            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f w_coarse %f w_bone %f w_root_depth %f\n' % (
+                epoch + 1,
+                elapsed,
+                lr,
+                losses_3d_train[-1] * 1000,
+                losses_3d_pos_train[-1] * 1000,
+                losses_3d_coarse_train[-1] * 1000,
+                losses_3d_bone_train[-1] * 1000,
+                losses_root_depth_train[-1] * 1000,
+                effective_weight_coarse,
+                effective_weight_bone,
+                effective_weight_root_depth
+            ))
+            f.close()
+
+        else:
+            print('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f w_coarse %f w_bone %f w_root_depth %f 3d_pos_valid %f' % (
+                epoch + 1,
+                elapsed,
+                lr,
+                losses_3d_train[-1] * 1000,
+                losses_3d_pos_train[-1] * 1000,
+                losses_3d_coarse_train[-1] * 1000,
+                losses_3d_bone_train[-1] * 1000,
+                losses_root_depth_train[-1] * 1000,
+                effective_weight_coarse,
+                effective_weight_bone,
+                effective_weight_root_depth,
                 losses_3d_valid[-1][0] * 1000
             ))
 
             log_path = os.path.join(args.checkpoint, 'training_log.txt')
             f = open(log_path, mode='a')
-            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f 3d_pos_valid %f\n' % (
+            f.write('[%d] time %.2f lr %f 3d_train %f 3d_pos_train %f 3d_coarse_train %f 3d_bone_train %f root_depth_train %f w_coarse %f w_bone %f w_root_depth %f 3d_pos_valid %f\n' % (
                 epoch + 1,
                 elapsed,
                 lr,
@@ -678,6 +708,9 @@ if not args.evaluate:
                 losses_3d_coarse_train[-1] * 1000,
                 losses_3d_bone_train[-1] * 1000,
                 losses_root_depth_train[-1] * 1000,
+                effective_weight_coarse,
+                effective_weight_bone,
+                effective_weight_root_depth,
                 losses_3d_valid[-1][0] * 1000
             ))
             f.close()
@@ -689,6 +722,9 @@ if not args.evaluate:
             writer.add_scalar("Loss/3d coarse TCN loss", losses_3d_coarse_train[-1] * 1000, epoch+1)
             writer.add_scalar("Loss/3d bone structure loss", losses_3d_bone_train[-1] * 1000, epoch+1)
             writer.add_scalar("Loss/root depth loss", losses_root_depth_train[-1] * 1000, epoch+1)
+            writer.add_scalar("LossWeight/coarse", effective_weight_coarse, epoch+1)
+            writer.add_scalar("LossWeight/bone", effective_weight_bone, epoch+1)
+            writer.add_scalar("LossWeight/root depth", effective_weight_root_depth, epoch+1)
             writer.add_scalar("Parameters/learing rate", lr, epoch+1)
             writer.add_scalar('Parameters/training time per epoch', elapsed, epoch+1)
         # Decay learning rate exponentially
@@ -708,6 +744,7 @@ if not args.evaluate:
                 'lr': lr,
                 'random_state': train_generator.random_state(),
                 'optimizer': optimizer.state_dict(),
+                'loss_normalizer': loss_normalizer.state_dict(),
                 'model_pos': model_pos_train.state_dict(),
             }, chk_path)
 
@@ -723,6 +760,7 @@ if not args.evaluate:
                 'lr': lr,
                 'random_state': train_generator.random_state(),
                 'optimizer': optimizer.state_dict(),
+                'loss_normalizer': loss_normalizer.state_dict(),
                 'model_pos': model_pos_train.state_dict(),
             }, best_chk_path)
             if epoch >= args.save_emin and args.save_lmin <= losses_3d_valid[-1][0] * 1000 <= args.save_lmax and flag_best_20_10 == False:
@@ -732,6 +770,7 @@ if not args.evaluate:
                     'lr': lr,
                     'random_state': train_generator.random_state(),
                     'optimizer': optimizer.state_dict(),
+                    'loss_normalizer': loss_normalizer.state_dict(),
                     'model_pos': model_pos_train.state_dict(),
                 }, best_chk_path_epoch)
 

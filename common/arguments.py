@@ -194,6 +194,17 @@ def parse_args():
                         help='maximum predicted camera-space root depth in meters')
     parser.add_argument('--root-joint-index', default=0, type=int,
                         help='root joint index used for root-ray back-projection')
+    parser.add_argument('--disable-adaptive-loss-normalization', dest='adaptive_loss_normalization',
+                        action='store_false',
+                        help='disable EMA normalization for auxiliary losses')
+    parser.add_argument('--adaptive-loss-ema-decay', default=0.99, type=float,
+                        help='EMA decay used to normalize auxiliary losses')
+    parser.add_argument('--adaptive-loss-eps', default=1e-6, type=float,
+                        help='epsilon used by EMA auxiliary loss normalization')
+    parser.add_argument('--adaptive-loss-min-scale', default=0.25, type=float,
+                        help='minimum EMA scale applied to auxiliary losses; <=0 disables lower clamp')
+    parser.add_argument('--adaptive-loss-max-scale', default=4.0, type=float,
+                        help='maximum EMA scale applied to auxiliary losses; <=0 disables upper clamp')
     parser.add_argument('--bone-loss-weight', default=0.02, type=float,
                         help='global weight for supervised bone/skeleton structure loss')
     parser.add_argument('--bone-direction-loss-weight', default=0.2, type=float,
@@ -211,6 +222,7 @@ def parse_args():
     parser.set_defaults(data_augmentation=True)
     parser.set_defaults(test_time_augmentation=True)
     parser.set_defaults(geometry_prompt=True)
+    parser.set_defaults(adaptive_loss_normalization=True)
 
     args = parser.parse_args()
     # Check invalid configuration
