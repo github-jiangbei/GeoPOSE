@@ -6,17 +6,19 @@ class EMALossNormalizer:
     EMA-based auxiliary loss normalizer.
 
     The base weight remains the user's explicit hyperparameter. EMA only rescales
-    each auxiliary loss by its historical magnitude so losses with different
-    units do not dominate purely because of raw scale.
+    each auxiliary loss by its relative change from its own reference EMA. This
+    avoids making the scale depend on raw units such as meters vs. unitless
+    direction losses.
     """
 
-    def __init__(self, enabled=True, decay=0.99, eps=1e-6, min_scale=0.25, max_scale=4.0):
+    def __init__(self, enabled=True, decay=0.99, eps=1e-6, min_scale=0.5, max_scale=2.0):
         self.enabled = bool(enabled)
         self.decay = float(decay)
         self.eps = float(eps)
         self.min_scale = None if min_scale is None or min_scale <= 0 else float(min_scale)
         self.max_scale = None if max_scale is None or max_scale <= 0 else float(max_scale)
         self.ema = {}
+        self.reference_ema = {}
         self.last_effective_weights = {}
 
     def _update_ema(self, name, loss):
@@ -44,8 +46,14 @@ class EMALossNormalizer:
             return base_weight * loss
 
         ema = self._update_ema(name, loss)
+        reference = self.reference_ema.get(name)
+        if reference is None:
+            reference = ema.detach()
+            self.reference_ema[name] = reference
+
         with torch.no_grad():
-            scale = 1.0 / (ema + self.eps)
+            reference = reference.to(device=ema.device, dtype=ema.dtype)
+            scale = reference / (ema + self.eps)
             if self.min_scale is not None or self.max_scale is not None:
                 min_scale = self.min_scale if self.min_scale is not None else -float('inf')
                 max_scale = self.max_scale if self.max_scale is not None else float('inf')
@@ -58,6 +66,7 @@ class EMALossNormalizer:
     def state_dict(self):
         return {
             'ema': {name: value.detach().cpu() for name, value in self.ema.items()},
+            'reference_ema': {name: value.detach().cpu() for name, value in self.reference_ema.items()},
             'last_effective_weights': dict(self.last_effective_weights),
         }
 
@@ -67,5 +76,12 @@ class EMALossNormalizer:
         self.ema = {
             name: value.detach()
             for name, value in state_dict.get('ema', {}).items()
+        }
+        loaded_reference = state_dict.get('reference_ema')
+        if loaded_reference is None:
+            loaded_reference = state_dict.get('ema', {})
+        self.reference_ema = {
+            name: value.detach()
+            for name, value in loaded_reference.items()
         }
         self.last_effective_weights = dict(state_dict.get('last_effective_weights', {}))
