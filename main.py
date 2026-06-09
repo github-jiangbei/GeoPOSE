@@ -404,10 +404,13 @@ if not args.evaluate:
         else:
             print('WARNING: this checkpoint does not contain an optimizer state. The optimizer will be reinitialized.')
         if not args.coverlr:
-            lr = checkpoint['lr']
-        
-        lr = 0.000008
-        # lr = 0.000017
+            lr = checkpoint.get('lr', lr)
+        else:
+            lr = args.learning_rate
+
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+        print('INFO: Resume learning rate set to {}'.format(lr))
 
     print('** Note: reported losses are averaged over all frames.')
     print('** The final evaluation will be carried out after the last training epoch.')
