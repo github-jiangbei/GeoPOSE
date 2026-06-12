@@ -829,7 +829,7 @@ def evaluate(test_generator, action=None, return_predictions=False, use_trajecto
             if not use_trajectory_model:
                 # load best checkpoint
                 if args.evaluate == '':
-                    chk_file_path = os.path.join(args.checkpoint, 'best_epoch_%d_%.2f.bin' % (best_epoch, min_loss))
+                    chk_file_path = os.path.join(args.checkpoint, 'best_epoch_1_1.bin')
                     print('Loading best checkpoint', chk_file_path)
                 elif args.evaluate != '':
                     chk_file_path = os.path.join(args.checkpoint, args.evaluate)
