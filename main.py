@@ -1141,6 +1141,9 @@ if args.render:
 
 else:
     print('Evaluating...')
+    if args.evaluate == '' and not args.p2:
+        args.p2 = True
+        print('INFO: Enabling Protocol #2 (P-MPJPE) for final post-training evaluation.')
     all_actions = {}
     all_actions_flatten = []
     all_actions_by_subject = {}
