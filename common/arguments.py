@@ -203,8 +203,8 @@ def parse_args():
                         help='epsilon used by EMA auxiliary loss normalization')
     parser.add_argument('--adaptive-loss-min-scale', default=0.5, type=float,
                         help='minimum EMA scale applied to auxiliary losses; <=0 disables lower clamp')
-    parser.add_argument('--adaptive-loss-max-scale', default=2.0, type=float,
-                        help='maximum EMA scale applied to auxiliary losses; <=0 disables upper clamp')
+    parser.add_argument('--adaptive-loss-max-scale', default=1.0, type=float,
+                        help='maximum EMA scale for protective auxiliary-loss normalization; default does not amplify')
     parser.add_argument('--bone-loss-weight', default=0.02, type=float,
                         help='global weight for supervised bone/skeleton structure loss')
     parser.add_argument('--bone-direction-loss-weight', default=0.2, type=float,

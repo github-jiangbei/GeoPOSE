@@ -5,13 +5,15 @@ class EMALossNormalizer:
     """
     EMA-based auxiliary loss normalizer.
 
-    The base weight remains the user's explicit hyperparameter. EMA only rescales
-    each auxiliary loss by its relative change from its own reference EMA. This
-    avoids making the scale depend on raw units such as meters vs. unitless
-    direction losses.
+    The base weight remains the user's explicit hyperparameter. EMA is used
+    as a protective normalizer for auxiliary losses: the base weight is the
+    maximum intended strength, and normalization only down-weights an
+    auxiliary term when its EMA grows above its reference. This avoids the
+    failure mode where decreasing auxiliary losses are rewarded by larger
+    weights and quickly saturate at max_scale.
     """
 
-    def __init__(self, enabled=True, decay=0.99, eps=1e-6, min_scale=0.5, max_scale=2.0):
+    def __init__(self, enabled=True, decay=0.99, eps=1e-6, min_scale=0.5, max_scale=1.0):
         self.enabled = bool(enabled)
         self.decay = float(decay)
         self.eps = float(eps)
@@ -53,7 +55,7 @@ class EMALossNormalizer:
 
         with torch.no_grad():
             reference = reference.to(device=ema.device, dtype=ema.dtype)
-            scale = reference / (ema + self.eps)
+            scale = torch.minimum(reference / (ema + self.eps), torch.ones_like(ema))
             if self.min_scale is not None or self.max_scale is not None:
                 min_scale = self.min_scale if self.min_scale is not None else -float('inf')
                 max_scale = self.max_scale if self.max_scale is not None else float('inf')
